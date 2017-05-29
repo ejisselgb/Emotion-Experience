@@ -1,1 +1,1 @@
-aqui se almacenan los informes generados
+En esta carpeta se almacenan los informes generados por el software para llevar a cabo el análisis estadístico de las emociones identificadas
