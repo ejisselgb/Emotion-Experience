@@ -1,1 +1,1 @@
-carpetas de la bd
+Es importante que cree su propia base de datos para probar el software, se recomienda un cantidad de 50 imágenes por carpeta para un total de 150 imágenes.
