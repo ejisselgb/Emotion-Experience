@@ -17,3 +17,9 @@ Sandra Cano
 Universidad de San Buenaventura Cali
 Ingeniería Multimedia
 28 de mayo de 2017
+
+
+*Para ejecutar el software ingrese el siguiente comando por consola:
+python C:\Users\your_user\your_folder\Emotion-Experience\Interface.py
+
+
