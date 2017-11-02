@@ -23,6 +23,7 @@ from openpyxl.chart import (
     ProjectedPieChart,
     Reference
 )
+from imutils.video import VideoStream
 
 
 class MainWindow(wx.Panel):#clase de la interfaz principal
@@ -100,11 +101,13 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
             "Realmente desea salir de la aplicacion?",
             "Confirm Exit", wx.OK|wx.CANCEL|wx.ICON_QUESTION)
         self.result = dlg.ShowModal()
-        if self.result == wx.ID_OK:
+        if self.result == wx.ID_OK & cv2.waitKey(1):
             #dlg.Destroy()
             self.Close()
             frame.Close()
             self.Destroy()
+        #if cv2.waitKey(1):
+            sys.exit()
             
     def webcamSelect(self, event):
         indexWebcam = event.GetSelection()
@@ -219,6 +222,7 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
                 self.threads.append(self.x)
                 self.x.start()
                 self.inicioSesion = True
+
         else:
             print("no digito un numero");
             
@@ -271,6 +275,7 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
         self.distancias = [] #las distancias registradas por cada comparacion, para sacar porcentaje de error
         self.tiempos = []#los tiempos en que se produce cada imagen
         self.direccionCascade = "./haarcascade_frontalface_default.xml"
+        self.out = None
 
         self.capture = capture
         ret, frame = self.capture.read()
@@ -296,14 +301,30 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
         estadoBoxSizer = wx.BoxSizer(wx.HORIZONTAL)
         estadoBoxSizer.Add(self.estadoInterfaz,0,wx.LEFT,10)
 
+        self.out = cv2.VideoWriter('./video/output.avi', -1, 8, (640,480))
+        
+
 
     def OnPaint(self, evt):
         dc = wx.BufferedPaintDC(self)
         dc.DrawBitmap(self.bmp, 0, 0)
-        
+
 
     def NextFrame(self, event):
+
         ret, frame = self.capture.read()
+
+        if self.out != None:
+            if ret==True:
+                # write the flipped frame
+                self.out.write(frame)
+                #cv2.imshow('frame',frame)
+
+            # Release everything if job is finished
+            #self.capture.release()
+            #self.out.release()
+            #cv2.destroyAllWindows()
+
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             faceCascade = cv2.CascadeClassifier(self.direccionCascade)
@@ -315,6 +336,7 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
                 minSize=(30, 30),
                 flags=cv2.cv.CV_HAAR_SCALE_IMAGE
             )
+            
             # Draw a rectangle around the faces
             for (x, y, w, h) in self.faces:
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 0), 1)
@@ -331,6 +353,7 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
         start = time.time()
         self.cambioEstado = True
         self.estadoInterfaz.SetLabel("Capturando....")
+        #print self.out
         while self.inSesion:#mientras la sesion se encuentre verdadera el programa estara capturando y extrayendo caras
                 if self.cx != None:#si el valor de x del rectangulo que se dibuja en la cara existe o es diferente a nulo significa que el sistema ha detectado un rostro
                     self.cropPhoto()#funcion que se encarga de extraer la cara, preprocesarla y almacenarla en disco
@@ -388,6 +411,7 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
                 self.porcentajeError = self.distanciaPromedio
                 print self.porcentajeError,"%"
                 self.estadoInterfaz.SetLabel("El informe esta listo!, presione Generar Informe")
+
                 #se vacia la lista de emociones, para posteriores sesiones
                 #self.emociones = []
     
@@ -407,11 +431,13 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
     def timersito(self):
         self.inSesion = False#cuando la sesion es falsa el programa deja de capturar y guardar las caras y empieza el proceso de comparacion con la bd
 
+
 index = 0
 capture = cv2.VideoCapture(index)
 webcams = []
 while True:
-    ret, frame = capture.read(0)
+    ret, frame = capture.read(0) 
+
     if ret:
         webcams.append('Webcam '+str(index))
         index = index+1
@@ -422,6 +448,7 @@ while True:
         capture.set(cv.CV_CAP_PROP_FRAME_HEIGHT, 480)
         break
 print(webcams)
+
 capture.set(cv.CV_CAP_PROP_FRAME_WIDTH, 640)
 capture.set(cv.CV_CAP_PROP_FRAME_HEIGHT, 480)
 app = wx.App(False)
