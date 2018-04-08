@@ -24,10 +24,11 @@ from openpyxl.chart import (
     Reference
 )
 from imutils.video import VideoStream
-
+from os import getcwd, listdir
+from os.path import abspath
 
 class MainWindow(wx.Panel):#clase de la interfaz principal
-    def __init__(self, parent,capture):
+    def __init__(self, parent, capture):
         wx.Panel.__init__(self, parent)
         self.panelResultados = PanelResultados(self)
         mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -58,8 +59,8 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
         label = wx.StaticText(self,label="Establecer tiempo")
         labelwc = wx.StaticText(self,label="Dispositivo de captura")
         labelBoxSizer = wx.BoxSizer(wx.HORIZONTAL)
-        labelBoxSizer.Add(label, 0, wx.LEFT,105)
-        labelBoxSizer.Add(labelwc, 0, wx.LEFT,195)
+        labelBoxSizer.Add(label, 0, wx.LEFT,100)
+        labelBoxSizer.Add(labelwc, 0, wx.LEFT,100)
         mainSizer.Add(labelBoxSizer,0)
         mainSizer.AddSpacer(5)
         #Textbox
@@ -68,9 +69,9 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
         label2 = wx.StaticText(self,label="Seg")
         combobox = wx.ComboBox(self, -1, choices=webcams, value='Webcam 0', style=wx.CB_DROPDOWN, size=[150,50])
         combobox.Bind(wx.EVT_COMBOBOX, self.webcamSelect)
-        textBoxSizer.Add(self.inputBox, 0, wx.LEFT , 105)
+        textBoxSizer.Add(self.inputBox, 0, wx.LEFT , 30)
         textBoxSizer.Add(label2, 0, wx.LEFT, 10)
-        textBoxSizer.Add(combobox, 0, wx.LEFT , 150)
+        textBoxSizer.Add(combobox, 0, wx.LEFT , 90)
         textBoxSizer.SetDimension(0,0,640,1200)
         mainSizer.Add(textBoxSizer,0)
         #mainSizer.AddSpacer(2)
@@ -78,23 +79,42 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
         buttonBoxSizer = wx.BoxSizer(wx.HORIZONTAL)
         b_sesion = wx.Button(self, wx.ID_CLOSE, "Comenzar")
         b_sesion.Bind(wx.EVT_BUTTON, self.sesion)
-        buttonBoxSizer.Add(b_sesion,0,  wx.LEFT , 115)
+        buttonBoxSizer.Add(b_sesion,0,  wx.LEFT , 30)
+
+        #button para iniciar reconocimiento
+        b_procesar = wx.Button(self, wx.ID_CLOSE, "Procesar")
+        b_procesar.Bind(wx.EVT_BUTTON, self.reconocerEmociones)
+        buttonBoxSizer.Add(b_procesar,0, wx.LEFT, 30)
+
         # button resultados
         b_resultados = wx.Button(self, wx.ID_CLOSE, "Generar Informe")
         b_resultados.Bind(wx.EVT_BUTTON, self.generarInforme)
-        buttonBoxSizer.Add(b_resultados,0, wx.LEFT, 210)
-        mainSizer.Add(buttonBoxSizer,0)
-        mainSizer.AddSpacer(10)
-        # button cerrar
-        buttonBoxSizer2 = wx.BoxSizer(wx.HORIZONTAL)
+        buttonBoxSizer.Add(b_resultados,0, wx.LEFT, 30)
+
+        # button escoger video de la emocion a evaluar
+        b_videoSelected = wx.Button(self, wx.ID_CLOSE, "Escoger video")
+        b_videoSelected.Bind(wx.EVT_BUTTON, self.seleccionarVideo)
+        buttonBoxSizer.Add(b_videoSelected,0,  wx.LEFT , 30)
+
+        # button para cerrar aplicacion
         m_close1 = wx.Button(self, wx.ID_CLOSE, "Cerrar")
         m_close1.Bind(wx.EVT_BUTTON, self.OnClose)
-        buttonBoxSizer2.Add(m_close1,0, wx.LEFT, 270)
-        mainSizer.Add(buttonBoxSizer2,0)
+        buttonBoxSizer.Add(m_close1,0, wx.LEFT, 30)
 
+        mainSizer.Add(buttonBoxSizer,0)
+        mainSizer.AddSpacer(10)
+
+ 
         parent.Centre()
         self.Show()
         self.SetSizerAndFit(mainSizer)
+
+        self.porcentajeFeliz = 0
+        self.porcentajeNeutro = 0
+        self.porcentajeMolesto = 0
+        self.felicidad = 0
+        self.neutralidad = 0
+        self.molestia = 0
         
     def OnClose(self, event): #Funcion que controla el boton de cerrar
         dlg = wx.MessageDialog(self, 
@@ -119,11 +139,108 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
         self.panelsito = PanelResultados(self.framer)
 
         
+    def seleccionarVideo(self, event):
+        #self.dlgSelectedVideo = wx.DirDialog(self, "Selecciona un video para evaluar las emociones (Alegria - Disgusto - Neutro)",
+         #                  style=wx.DD_DEFAULT_STYLE
+         #                  )
+        
+        self.cap.estadoInterfaz.SetLabel("Esta funcionalidad aun no esta implementada")
+        
+    def sesion(self, event): #Funcion que se llama para iniciar una sesion de captura de emociones    
+        self.cap.emociones = []
+        self.cap.tiempos = []
+        self.cap.distancias = []
+        self.inicioSesion = False
+        tiempo = None
+        direccion = None
+        tiempo = self.inputBox.GetValue()
+        if(tiempo != None and tiempo.isdigit()): # valida si el valor indicado es numero
+        # start the app
+            self.dlg2 = wx.DirDialog(self, "Escoge la carpeta donde se almacenaran las caras:",
+                           style=wx.DD_DEFAULT_STYLE
+                           )
+            if self.dlg2.ShowModal() == wx.ID_OK:
+                direccion = self.dlg2.GetPath()
+            self.dlg2.Destroy()
+            if direccion != None:
+                self.cap.direccion = direccion
+                self.threads = []
+                self.cap.tiempoLimite = int(tiempo)
+                self.cap.inSesion = True
+                t = threading.Timer(float(tiempo), self.cap.timersito)#Setea iniciar el timer segun el tiempo puesto por el usuario
+                t.start()
+                self.cap.conTime = 0
+                self.cap.numberImage = 0
+                self.x = threading.Thread(target=self.cap.rec)
+                self.threads.append(self.x)
+                self.x.start()
+                self.inicioSesion = True
+
+        else:
+            print("no digito un numero");
+
+
+    def reconocerEmociones(self, event):
+
+        self.dlg3 = wx.DirDialog(self, "Selecciona la carpeta de rostros a evaluar:",
+                           style=wx.DD_DEFAULT_STYLE
+                           )
+        if self.dlg3.ShowModal() == wx.ID_OK:
+            direccion = self.dlg3.GetPath()
+        self.dlg3.Destroy()
+
+        self.ruta = direccion
+        self.list = listdir(self.ruta)
+        self.arrayDireccionImage = []
+        for value in self.list:
+            self.arrayDireccionImage.append(direccion+"/"+value)
+
+        self.cap.estadoInterfaz.SetLabel("Reconociendo... puede demorar")
+
+        directorioAlegria = os.path.abspath('./bd/Alegria')
+        directorioDisgusto = os.path.abspath('./bd/Disgusto')
+        directorioNeutro = os.path.abspath('./bd/Neutro')
+        self.pyf=pyfaces.PyFaces(self.arrayDireccionImage,directorioAlegria,directorioNeutro,directorioDisgusto,int(4),float(0.3))
+        self.emociones = self.pyf.arregloEmociones#se agrega a la lista de emociones la emocion que acaba de ser detectada
+        self.distancias = self.pyf.arregloDistancias#se agrega a la lista de distancias la distancia que corresponde a la emocion detectada
+        print(self.emociones)
+        print(self.distancias)
+        self.cambioEstadoVideo = False
+        self.felicidad = self.emociones.count("Alegria")#cuenta cuantas veces se encuentra feliz en la lista
+        self.neutralidad = self.emociones.count("Neutro")#cuenta cuantas veces se encuentra neutro en la lista
+        self.molestia = self.emociones.count("Disgusto")#cuenta cuantas veces se encuentra molesto en la lista
+        #se imprimen los resultados de conteo
+        print "Resultados"
+        print "Alegria se presento "+str(self.felicidad)+" veces"
+        print "Neutralidad se presento "+str(self.neutralidad)+" veces"
+        print "Disgusto se presento "+str(self.molestia)+" veces"
+        #se sacan los porcentajes de cada emocion segun el numero de caras extraidas durante el proceso
+        self.total = self.felicidad + self.neutralidad + self.molestia
+        if self.total != 0:
+            self.porcentajeFeliz = self.felicidad*100/self.total
+            self.porcentajeNeutro = self.neutralidad*100/self.total
+            self.porcentajeMolesto = self.molestia*100/self.total
+        else:
+            self.porcentajeFeliz = 0
+            self.porcentajeNeutro = 0
+            self.porcentajeMolesto = 0
+                #se imprimen los porcentajes
+        print "Porcentajes emociones"
+        print "Felicidad "+str(self.porcentajeFeliz)+"%"
+        print "Neutralidad "+str(self.porcentajeNeutro)+"%"
+        print "Molestia "+str(self.porcentajeMolesto)+"%"
+        print "Porcentaje de error"
+        self.distanciaPromedio = sum(self.distancias)/len(self.distancias)
+        self.porcentajeError = self.distanciaPromedio
+        print self.porcentajeError,"%"
+        self.cap.estadoInterfaz.SetLabel("Reconocimiento exitoso, ya puede generar el informe")
+
+
     def generarInforme(self, event):
         self.book = Workbook()
-        self.panelsito.grid.SetCellValue(1,1,str(self.cap.porcentajeFeliz)+'%')
-        self.panelsito.grid.SetCellValue(2,1,str(self.cap.porcentajeMolesto)+'%')
-        self.panelsito.grid.SetCellValue(3,1,str(self.cap.porcentajeNeutro)+'%')
+        self.panelsito.grid.SetCellValue(1,1,str(self.porcentajeFeliz)+'%')
+        self.panelsito.grid.SetCellValue(2,1,str(self.porcentajeMolesto)+'%')
+        self.panelsito.grid.SetCellValue(3,1,str(self.porcentajeNeutro)+'%')
         self.framer.Show()
         self.sheet = self.book.active
         self.sheet.title = 'Emociones-Tiempo'
@@ -159,9 +276,9 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
 
         rowsR = [
             ('Emociones', 'Repeticiones', 'Porcentaje'),
-            ('Alegria', int(self.cap.felicidad), int(self.cap.porcentajeFeliz)),
-            ('Disgusto', int(self.cap.molestia), int(self.cap.porcentajeMolesto)),
-            ('Neutro', int(self.cap.neutralidad), int(self.cap.porcentajeNeutro)),
+            ('Alegria', int(self.felicidad), int(self.porcentajeFeliz)),
+            ('Disgusto', int(self.molestia), int(self.porcentajeMolesto)),
+            ('Neutro', int(self.neutralidad), int(self.porcentajeNeutro)),
         ]
 
 
@@ -171,7 +288,7 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
         rowI = []
         rowI = [
             ('Tasa de error', 'N. Imagenes', 'Distancia Promedio', 'Duracion de la sesion'),
-            (self.cap.porcentajeError, self.cap.total, self.cap.distanciaPromedio, str(self.inputBox.GetValue()) + ' s'),
+            (self.porcentajeError, self.total, self.distanciaPromedio, str(self.inputBox.GetValue()) + ' s'),
         ]
         for row in rowI:
             self.sheet3.append(row)
@@ -188,44 +305,8 @@ class MainWindow(wx.Panel):#clase de la interfaz principal
 
         self.sheet2.add_chart(chart, "D7")
 
-
-
         self.book.save("./Informes/InformeEmotionExperience"+"_"+time.strftime("%d-%m-%Y")+"_"+time.strftime("%H-%M-%S")+".xlsx")
-        self.cap.estadoInterfaz.SetLabel("El informa ha sido generado!, esperando nuevas instrucciones")
-        
-    def sesion(self, event): #Funcion que se llama para iniciar una sesion de captura de emociones    
-        self.cap.emociones = []
-        self.cap.tiempos = []
-        self.cap.distancias = []
-        self.inicioSesion = False
-        tiempo = None
-        direccion = None
-        tiempo = self.inputBox.GetValue()
-        if(tiempo != None and tiempo.isdigit()): # valida si el valor indicado es numero
-        # start the app
-            self.dlg2 = wx.DirDialog(self, "Escoge la carpeta donde se almacenaran las caras:",
-                           style=wx.DD_DEFAULT_STYLE
-                           )
-            if self.dlg2.ShowModal() == wx.ID_OK:
-                direccion = self.dlg2.GetPath()
-            self.dlg2.Destroy()
-            if direccion != None:
-                self.cap.direccion = direccion
-                self.threads = []
-                self.cap.tiempoLimite = int(tiempo)
-                self.cap.inSesion = True
-                t = threading.Timer(float(tiempo), self.cap.timersito)#Setea iniciar el timer segun el tiempo puesto por el usuario
-                t.start()
-                self.cap.conTime = 0
-                self.cap.numberImage = 0
-                self.x = threading.Thread(target=self.cap.rec)
-                self.threads.append(self.x)
-                self.x.start()
-                self.inicioSesion = True
-
-        else:
-            print("no digito un numero");
-            
+        self.cap.estadoInterfaz.SetLabel("El informe ha sido generado!, esperando nuevas instrucciones")
         
 class PanelResultados(wx.Panel):
     def __init__(self, parent):
@@ -253,6 +334,8 @@ class PanelResultados(wx.Panel):
 
 class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la captura de caras
     def __init__(self, parent, capture, fps=24):
+        self.testVar = "FUNCIONOENSTOY EN SHOWWWW"
+        self.direccionImagenes = [] #almacena las direcciones de las caras extraidas y preprocesadas
         wx.Panel.__init__(self, parent, wx.ID_ANY, (0,0), (640,480))
         self.emocion = None
         self.faces = None
@@ -276,6 +359,8 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
         self.tiempos = []#los tiempos en que se produce cada imagen
         self.direccionCascade = "./haarcascade_frontalface_default.xml"
         self.out = None
+        self.cambioEstadoVideo = False
+        self.videonumber = 0
 
         self.capture = capture
         ret, frame = self.capture.read()
@@ -296,14 +381,15 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
 
         #Estado
         font1 = wx.Font(10, wx.MODERN, wx.NORMAL, wx.NORMAL)
-        self.estadoInterfaz = wx.StaticText(self, wx.ID_ANY, label="Listo para comenzar!", style=wx.ALIGN_CENTER)
+        self.estadoInterfaz = wx.StaticText(self, wx.ID_ANY, label="Listo para iniciar, seleccione una opcion", style=wx.ALIGN_CENTER)
         self.estadoInterfaz.SetFont(font1)
         estadoBoxSizer = wx.BoxSizer(wx.HORIZONTAL)
         estadoBoxSizer.Add(self.estadoInterfaz,0,wx.LEFT,10)
 
-        self.out = cv2.VideoWriter('./video/output.avi', -1, 8, (640,480))
-        
+        print self.cambioEstadoVideo
 
+
+        self.out = cv2.VideoWriter('./video/output'+str(self.videonumber)+time.strftime("%d-%m-%Y")+'.avi', -1, 8, (640,480))
 
     def OnPaint(self, evt):
         dc = wx.BufferedPaintDC(self)
@@ -314,11 +400,12 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
 
         ret, frame = self.capture.read()
 
-        if self.out != None:
-            if ret==True:
-                # write the flipped frame
-                self.out.write(frame)
-                #cv2.imshow('frame',frame)
+        if self.cambioEstadoVideo == True:
+            if self.out != None:
+                if ret==True:
+                    # write the flipped frame
+                    self.out.write(frame)
+                    #cv2.imshow('frame',frame)
 
             # Release everything if job is finished
             #self.capture.release()
@@ -349,10 +436,11 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
             self.Refresh()           
 
     def rec(self): #extrae cara en segundo plano
-        self.direccionImagenes = [] #almacena las direcciones de las caras extraidas y preprocesadas
         start = time.time()
         self.cambioEstado = True
-        self.estadoInterfaz.SetLabel("Capturando....")
+        self.estadoInterfaz.SetLabel("Grabando....")
+        self.cambioEstadoVideo = True
+        self.videonumber += 1
         #print self.out
         while self.inSesion:#mientras la sesion se encuentre verdadera el programa estara capturando y extrayendo caras
                 if self.cx != None:#si el valor de x del rectangulo que se dibuja en la cara existe o es diferente a nulo significa que el sistema ha detectado un rostro
@@ -373,48 +461,16 @@ class ShowCapture(wx.Panel):#clase en donde se setea parametros de video y la ca
                 sleep(1)#sleep se encarga de parar este loop por cuantos segundos se requiera, esto define cuantos rostros se extraen segun el tiempo que se asigne 
         if self.inSesion == False:#empieza la comparacion de las caras extraidas con la base de datos
                 print("se acabo la captura, empieza el proceso eigenfaces")
-                self.estadoInterfaz.SetLabel("Reconociendo emociones....")
-                #se llama a pyfaces que contiene el algoritmo para la comparacion y definicion de emociones, uso: (imagenAComparar,carpetaFeliz,carpetaNeutro,carpetaMolesto,numeroEigenFaces,umbralDeAceptacion)
-                directorioAlegria = os.path.abspath('./bd/Alegria')
-                directorioDisgusto = os.path.abspath('./bd/Disgusto')
-                directorioNeutro = os.path.abspath('./bd/Neutro')
-                self.pyf=pyfaces.PyFaces(self.direccionImagenes,directorioAlegria,directorioNeutro,directorioDisgusto,int(4),float(0.3))
-                self.emociones = self.pyf.arregloEmociones#se agrega a la lista de emociones la emocion que acaba de ser detectada
-                self.distancias = self.pyf.arregloDistancias#se agrega a la lista de distancias la distancia que corresponde a la emocion detectada
-                print(self.emociones)
-                print(self.distancias)
-                self.felicidad = self.emociones.count("Alegria")#cuenta cuantas veces se encuentra feliz en la lista
-                self.neutralidad = self.emociones.count("Neutro")#cuenta cuantas veces se encuentra neutro en la lista
-                self.molestia = self.emociones.count("Disgusto")#cuenta cuantas veces se encuentra molesto en la lista
-                #se imprimen los resultados de conteo
-                print "Resultados"
-                print "Alegria se presento "+str(self.felicidad)+" veces"
-                print "self.Neutralidad se presento "+str(self.neutralidad)+" veces"
-                print "Disgusto se presento "+str(self.molestia)+" veces"
-                #se sacan los porcentajes de cada emocion segun el numero de caras extraidas durante el proceso
-                self.total = self.felicidad + self.neutralidad + self.molestia
-                if self.total != 0:
-                    self.porcentajeFeliz = self.felicidad*100/self.total
-                    self.porcentajeNeutro = self.neutralidad*100/self.total
-                    self.porcentajeMolesto = self.molestia*100/self.total
-                else:
-                    self.porcentajeFeliz = 0
-                    self.porcentajeNeutro = 0
-                    self.porcentajeMolesto = 0
-                #se imprimen los porcentajes
-                print "Porcentajes emociones"
-                print "Felicidad "+str(self.porcentajeFeliz)+"%"
-                print "Neutralidad "+str(self.porcentajeNeutro)+"%"
-                print "Molestia "+str(self.porcentajeMolesto)+"%"
-                print "Porcentaje de error"
-                self.distanciaPromedio = sum(self.distancias)/len(self.distancias)
-                self.porcentajeError = self.distanciaPromedio
-                print self.porcentajeError,"%"
-                self.estadoInterfaz.SetLabel("El informe esta listo!, presione Generar Informe")
+                self.estadoInterfaz.SetLabel("Grabacion finalizada....")
+                self.cambioEstadoVideo = False
+                if self.cambioEstadoVideo == False:
+                    #self.capture.release()
+                    self.out.release()
+                    cv2.destroyAllWindows()
+                    print "Termino el procesamiento"
+                    self.out = cv2.VideoWriter('./video/output'+str(self.videonumber)+'.avi', -1, 8, (640,480))
+                    self.cambioEstadoVideo = True
 
-                #se vacia la lista de emociones, para posteriores sesiones
-                #self.emociones = []
-    
     def cropPhoto(self): #recorta cara y almacena
         #se extrae la seccion de la imagen que corresponde a la cara detectada
         self.imgFace = self.gray[self.cy:self.cy+self.ch, self.cx:self.cx+self.cw]
